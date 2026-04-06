@@ -1,0 +1,88 @@
+# =============================================
+# EnergyPulse API密钥配置文件
+# =============================================
+
+# === 数据源API ===
+fmp:
+  key: "otvlgwfkuAqsbdm0RsVJ3yY5ATHuiqUZ"
+  base_url: "https://financialmodelingprep.com"
+  rate_limit: 300
+
+tiingo:
+  key: "YOUR_TIINGO_KEY"
+  base_url: "https://api.tiingo.com"
+  rate_limit: 50
+
+alpha_vantage:
+  key: "YWW6BJSZYB6BRNWZ"
+  base_url: "https://www.alphavantage.co/query"
+  rate_limit: 5
+
+fred:
+  key: "451d2a25c4a4db537f1168cb27d28223"
+  base_url: "https://api.stlouisfed.org/fred"
+  rate_limit: 120
+
+eia:
+  key: "VASndGxaiSNjvHaEUelCiN20fJIiNbB9r0HVZEZM"
+  base_url: "https://api.eia.gov/v2"
+  rate_limit: 100
+
+tushare:
+  token: "aa4e546a6bf68db85c5add976a6bd6f493e35a8e2b65d77d8bce2448"
+  rate_limit: 200
+
+tavily:
+  key: "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"
+  base_url: "https://api.tavily.com"
+  rate_limit: 20
+
+exa:
+  key: "503302ab-f77c-4a14-8e06-8654977e11da"
+  base_url: "https://api.exa.ai"
+  rate_limit: 10
+
+serpapi:
+  key: "YOUR_SERPAPI_KEY"
+  base_url: "https://serpapi.com/search"
+  rate_limit: 100
+
+nasdaq:
+  key: "gmV18g23qrjNnrCwz-e6"
+  base_url: "https://data.nasdaq.com/api/v3"
+  rate_limit: 50
+
+metals:
+  key: "YOUR_METALS_KEY"
+  base_url: "https://metals-api.com/api"
+  rate_limit: 50
+
+visualcrossing:
+  key: "YOUR_VC_KEY"
+  base_url: "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline"
+  rate_limit_daily: 1000
+
+# === AI模型API ===
+deepseek:
+  key: "sk-7249a15804994b14a11124f3e7ea6ec6"
+  base_url: "https://api.deepseek.com/v1/chat/completions"
+
+qwen:
+  key: "YOUR_QWEN_KEY"
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+
+minimax:
+  key: "YOUR_MINIMAX_KEY"
+  base_url: "https://api.minimax.chat/v1/text/chatcompletion_v2"
+
+# === 推送 ===
+wechat:
+  report_webhook: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_KEY"
+  alert_webhook: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_ALERT_KEY"
+
+# === 代理（国内服务器） ===
+proxy:
+  enabled: false
+  cloudflare_worker_url: "https://your-worker.workers.dev"
+  cloudflare_token: "YOUR_CF_WORKER_TOKEN"
+  no_proxy: ["tushare", "deepseek", "qwen", "minimax"]

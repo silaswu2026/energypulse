@@ -1,0 +1,72 @@
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: ep_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      POSTGRES_DB: energypulse
+      POSTGRES_USER: epuser
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5432:5432"
+    deploy:
+      resources:
+        limits:
+          memory: 900M
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=64MB
+      -c effective_cache_size=512MB
+      -c max_connections=20
+      -c wal_buffers=8MB
+      -c log_min_duration_statement=1000
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U epuser -d energypulse"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  app:
+    build: ./services/app
+    container_name: ep_app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://epuser:${DB_PASSWORD}@postgres:5432/energypulse
+      - EP_CONFIG_DIR=/app/config
+      - TZ=Asia/Shanghai
+    deploy:
+      resources:
+        limits:
+          memory: 700M
+    volumes:
+      - ./logs:/app/logs
+      - ./reports:/app/reports
+      - ./config:/app/config
+    restart: always
+
+  web:
+    build: ./services/web
+    container_name: ep_web
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://epuser:${DB_PASSWORD}@postgres:5432/energypulse
+      - TZ=Asia/Shanghai
+    deploy:
+      resources:
+        limits:
+          memory: 300M
+    ports:
+      - "80:5000"
+    restart: always
+
+volumes:
+  pgdata:

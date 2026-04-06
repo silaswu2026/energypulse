@@ -1,0 +1,91 @@
+# =============================================
+# EnergyPulse API密钥配置文件
+# 部署时复制为 api_keys.yaml 并填入真实密钥
+# 此文件不入版本控制
+# =============================================
+
+# === 数据源API ===
+fmp:
+  key: "YOUR_FMP_KEY"
+  base_url: "https://financialmodelingprep.com/api"
+  rate_limit: 300
+
+tiingo:
+  key: "YOUR_TIINGO_KEY"
+  base_url: "https://api.tiingo.com"
+  rate_limit: 50
+
+alpha_vantage:
+  key: "YOUR_AV_KEY"
+  base_url: "https://www.alphavantage.co/query"
+  rate_limit: 5
+
+fred:
+  key: "YOUR_FRED_KEY"
+  base_url: "https://api.stlouisfed.org/fred"
+  rate_limit: 120
+
+eia:
+  key: "YOUR_EIA_KEY"
+  base_url: "https://api.eia.gov/v2"
+  rate_limit: 100
+
+tushare:
+  token: "YOUR_TUSHARE_TOKEN"
+  rate_limit: 200
+
+tavily:
+  key: "YOUR_TAVILY_KEY"
+  base_url: "https://api.tavily.com"
+  rate_limit: 20
+
+exa:
+  key: "YOUR_EXA_KEY"
+  base_url: "https://api.exa.ai"
+  rate_limit: 10
+
+serpapi:
+  key: "YOUR_SERPAPI_KEY"
+  base_url: "https://serpapi.com/search"
+  rate_limit: 100
+
+nasdaq:
+  key: "YOUR_NASDAQ_KEY"
+  base_url: "https://data.nasdaq.com/api/v3"
+  rate_limit: 50
+
+metals:
+  key: "YOUR_METALS_KEY"
+  base_url: "https://metals-api.com/api"
+  rate_limit: 50
+
+visualcrossing:
+  key: "YOUR_VC_KEY"
+  base_url: "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline"
+  rate_limit_daily: 1000
+
+# === AI模型API ===
+deepseek:
+  key: "YOUR_DEEPSEEK_KEY"
+  base_url: "https://api.deepseek.com/v1/chat/completions"
+
+qwen:
+  key: "YOUR_QWEN_KEY"
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+
+minimax:
+  key: "YOUR_MINIMAX_KEY"
+  base_url: "https://api.minimax.chat/v1/text/chatcompletion_v2"
+
+# === 推送 ===
+wechat:
+  report_webhook: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_KEY"
+  alert_webhook: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_ALERT_KEY"
+
+# === 代理（国内服务器） ===
+proxy:
+  enabled: true
+  cloudflare_worker_url: "https://your-worker.workers.dev"
+  cloudflare_token: "YOUR_CF_WORKER_TOKEN"
+  # 不需要代理的API（国内直连）
+  no_proxy: ["tushare", "deepseek", "qwen", "minimax"]

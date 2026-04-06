@@ -1,0 +1,278 @@
+"""
+EnergyPulse 主调度器
+合并 scheduler + reporter + pusher 为单进程，节省内存。
+使用 APScheduler 管理所有定时任务。
+"""
+
+import os
+import sys
+import logging
+import signal
+from datetime import datetime
+
+from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.triggers.cron import CronTrigger
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler("/app/logs/app.log", encoding="utf-8"),
+    ],
+)
+logger = logging.getLogger("energypulse.main")
+
+# 确保模块路径
+sys.path.insert(0, os.path.dirname(__file__))
+
+from database import get_db
+from collectors.yfinance_commodity import collect_commodities
+
+
+def run_collector(collector_class, source_id: str, **kwargs):
+    """安全运行单个采集器，捕获所有异常"""
+    try:
+        collector = collector_class(source_id, **kwargs)
+        collector.run()
+    except Exception as e:
+        logger.error(f"采集器 [{source_id}] 异常: {e}", exc_info=True)
+
+
+# ── 定时任务函数 ──
+
+def job_us_market_close():
+    """美股收盘数据采集 (北京时间00:00 = 美东11:00/12:00)"""
+    logger.info("=== 开始美股收盘数据采集 ===")
+    from collectors.fmp_stocks import FMPUSStockCollector
+    from collectors.fmp_commodities import FMPCommodityCollector
+    run_collector(FMPUSStockCollector, "us_stocks")
+    run_collector(FMPCommodityCollector, "commodities")
+
+
+def job_macro_data():
+    """宏观数据采集 (北京时间01:00)"""
+    logger.info("=== 开始宏观数据采集 ===")
+    from collectors.fred_macro import FREDMacroCollector
+    from collectors.eia_data import EIADataCollector
+    run_collector(FREDMacroCollector, "fred_macro")
+    run_collector(EIADataCollector, "eia_data")
+
+
+def job_weather():
+    """天气HDD/CDD采集 (北京时间00:30)"""
+    logger.info("=== 开始天气数据采集 ===")
+    from collectors.weather_hddcdd import WeatherHDDCDDCollector
+    run_collector(WeatherHDDCDDCollector, "weather")
+
+
+def job_news():
+    """新闻舆情采集 (每4小时)"""
+    logger.info("=== 开始新闻采集 ===")
+    from collectors.news_tavily import TavilyNewsCollector
+    from collectors.news_tiingo import TiingoNewsCollector
+    from collectors.news_rss import RSSNewsCollector
+    run_collector(TavilyNewsCollector, "news_tavily")
+    run_collector(TiingoNewsCollector, "news_tiingo")
+    run_collector(RSSNewsCollector, "news_rss")
+
+
+def job_cn_market_close():
+    """A股收盘数据采集 (北京时间16:00)"""
+    logger.info("=== 开始A股收盘数据采集 ===")
+    from collectors.tushare_stocks import TushareCNStockCollector
+    run_collector(TushareCNStockCollector, "cn_stocks")
+
+
+def job_technical_calc():
+    """技术指标计算 (北京时间02:00)"""
+    logger.info("=== 开始技术指标计算 ===")
+    from processors.technical import TechnicalProcessor
+    try:
+        proc = TechnicalProcessor()
+        proc.calculate_all()
+    except Exception as e:
+        logger.error(f"技术指标计算失败: {e}", exc_info=True)
+
+
+def job_generate_daily_report():
+    """生成日报 (北京时间03:00)"""
+    logger.info("=== 开始生成日报 ===")
+    from reporters.daily import DailyReportGenerator
+    try:
+        gen = DailyReportGenerator()
+        report = gen.generate()
+        logger.info(f"日报生成完成: {report.get('title', 'N/A')}")
+    except Exception as e:
+        logger.error(f"日报生成失败: {e}", exc_info=True)
+
+
+def job_push_daily_report():
+    """推送日报到微信 (北京时间05:00)"""
+    logger.info("=== 开始推送日报 ===")
+    # TODO: 实现微信推送
+    pass
+
+
+def job_weekly_report():
+    """生成周报 (每周日08:00)"""
+    logger.info("=== 开始生成周报 ===")
+    # TODO: Phase 5实现
+    pass
+
+
+def job_monthly_report():
+    """生成月报 (每月1日10:00)"""
+    logger.info("=== 开始生成月报 ===")
+    # TODO: Phase 5实现
+    pass
+
+
+def job_health_check():
+    """系统健康检查 (每5分钟)"""
+    try:
+        db = get_db()
+        db.query_one("SELECT 1")
+    except Exception as e:
+        logger.error(f"健康检查失败: {e}")
+
+
+def main():
+    logger.info("=" * 60)
+    logger.info("EnergyPulse 系统启动")
+    logger.info(f"时间: {datetime.now().isoformat()}")
+    logger.info(f"PID: {os.getpid()}")
+    logger.info("=" * 60)
+
+    # 验证数据库连接
+    try:
+        db = get_db()
+        db.query_one("SELECT 1")
+        logger.info("数据库连接正常")
+    except Exception as e:
+        logger.error(f"数据库连接失败: {e}")
+        sys.exit(1)
+
+    # 创建调度器（所有时间为北京时间 Asia/Shanghai）
+    scheduler = BlockingScheduler(timezone="Asia/Shanghai")
+
+    # ── 每日定时任务 ──
+
+    # 00:00 美股收盘数据
+    scheduler.add_job(job_us_market_close,
+                      CronTrigger(hour=0, minute=0),
+                      id="us_market_close", name="美股收盘数据")
+
+    # 00:30 天气HDD/CDD
+    scheduler.add_job(job_weather,
+                      CronTrigger(hour=0, minute=30),
+                      id="weather", name="天气数据")
+
+    # 01:00 宏观数据
+    scheduler.add_job(job_macro_data,
+                      CronTrigger(hour=1, minute=0),
+                      id="macro_data", name="宏观数据")
+
+    # 02:00 技术指标计算
+    scheduler.add_job(job_technical_calc,
+                      CronTrigger(hour=2, minute=0),
+                      id="technical_calc", name="技术指标计算")
+
+    # 03:00 生成日报
+    scheduler.add_job(job_generate_daily_report,
+                      CronTrigger(hour=3, minute=0),
+                      id="daily_report", name="生成日报")
+
+    # 05:00 推送日报
+    scheduler.add_job(job_push_daily_report,
+                      CronTrigger(hour=5, minute=0),
+                      id="push_daily", name="推送日报")
+
+    # 16:00 A股收盘
+    scheduler.add_job(job_cn_market_close,
+                      CronTrigger(hour=16, minute=0),
+                      id="cn_market_close", name="A股收盘数据")
+
+    # ── 周期性任务 ──
+
+    # 每4小时新闻采集 (02:00, 06:00, 10:00, 14:00, 18:00, 22:00)
+    scheduler.add_job(job_news,
+                      CronTrigger(hour="2,6,10,14,18,22", minute=0),
+                      id="news", name="新闻采集")
+
+    # 每5分钟健康检查
+    scheduler.add_job(job_health_check,
+                      CronTrigger(minute="*/5"),
+                      id="health_check", name="健康检查")
+
+    # ── 周度/月度任务 ──
+
+    # 周日08:00 周报
+    scheduler.add_job(job_weekly_report,
+                      CronTrigger(day_of_week="sun", hour=8, minute=0),
+                      id="weekly_report", name="生成周报")
+
+    # 每月1日10:00 月报
+    scheduler.add_job(job_monthly_report,
+                      CronTrigger(day=1, hour=10, minute=0),
+                      id="monthly_report", name="生成月报")
+
+    # 优雅退出
+    def shutdown(signum, frame):
+        logger.info("收到退出信号，正在关闭...")
+        scheduler.shutdown(wait=False)
+        get_db().close()
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, shutdown)
+    signal.signal(signal.SIGINT, shutdown)
+
+    # 启动调度器
+    logger.info(f"已注册 {len(scheduler.get_jobs())} 个定时任务")
+    for job in scheduler.get_jobs():
+        logger.info(f"  - {job.id}: {job.name} | {job.trigger}")
+
+    try:
+        scheduler.start()
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("系统已停止")
+
+
+if __name__ == "__main__":
+    main()
+
+
+def job_eia_commodities():
+    """EIA商品数据采集 (北京时间 22:00)"""
+    logger.info("=== 开始EIA商品数据采集 ===")
+    from collectors.eia_prices import collect_eia
+    try:
+        records = collect_eia()
+        logger.info(f"EIA采集完成: {len(records)} 条")
+    except Exception as e:
+        logger.error(f"EIA采集失败: {e}")
+
+
+def job_weekly_report():
+    """生成周报 (每周一早上8点)"""
+    logger.info("=== 开始生成周报 ===")
+    from reporters.weekly import WeeklyReportGenerator
+    try:
+        gen = WeeklyReportGenerator()
+        report = gen.generate()
+        logger.info(f"周报生成完成: {report[chr(39)]title[chr(39)]}")
+    except Exception as e:
+        logger.error(f"周报生成失败: {e}")
+
+
+def job_monthly_report():
+    """生成月报 (每月1号早上9点)"""
+    logger.info("=== 开始生成月报 ===")
+    from reporters.monthly import MonthlyReportGenerator
+    try:
+        gen = MonthlyReportGenerator()
+        report = gen.generate()
+        logger.info(f"月报生成完成: {report[chr(39)]title[chr(39)]}")
+    except Exception as e:
+        logger.error(f"月报生成失败: {e}")
