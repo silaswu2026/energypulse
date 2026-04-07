@@ -1,0 +1,56 @@
+version: "3.8"
+
+# Beta测试环境 - 多版本保留
+# 使用方法: BETA_VERSION=beta-1.0.1 docker-compose -f docker-compose.beta.yml -p beta-1-0-1 up -d
+
+services:
+  db:
+    image: timescale/timescaledb:latest-pg16
+    container_name: ep_db_${BETA_VERSION:-beta}
+    environment:
+      POSTGRES_USER: epuser
+      POSTGRES_PASSWORD: eppass
+      POSTGRES_DB: energypulse_${BETA_VERSION:-beta}
+    volumes:
+      - beta_data_${BETA_VERSION:-beta}:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U epuser"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: ./services/app
+      dockerfile: Dockerfile
+    container_name: ep_app_${BETA_VERSION:-beta}
+    environment:
+      - DATABASE_URL=postgresql://epuser:eppass@db:5432/energypulse_${BETA_VERSION:-beta}
+      - ENV=beta
+      - VERSION=${BETA_VERSION:-beta}
+    volumes:
+      - ./services/app:/app
+      - /app/__pycache__
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./services/web
+      dockerfile: Dockerfile
+    container_name: ep_web_${BETA_VERSION:-beta}
+    environment:
+      - DATABASE_URL=postgresql://epuser:eppass@db:5432/energypulse_${BETA_VERSION:-beta}
+      - ENV=beta
+      - VERSION=${BETA_VERSION:-beta}
+    ports:
+      - "${BETA_PORT:-6666}:5000"
+    volumes:
+      - ./services/web:/app
+    depends_on:
+      - db
+
+volumes:
+  beta_data:
