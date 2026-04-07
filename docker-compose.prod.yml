@@ -1,0 +1,52 @@
+version: "3.8"
+services:
+  db:
+    image: timescale/timescaledb:latest-pg16
+    container_name: ep_db
+    environment:
+      POSTGRES_USER: epuser
+      POSTGRES_PASSWORD: eppass
+      POSTGRES_DB: energypulse
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U epuser"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: ./services/app
+      dockerfile: Dockerfile
+    container_name: ep_app
+    environment:
+      - DATABASE_URL=postgresql://epuser:eppass@db:5432/energypulse
+      - ENV=production
+    volumes:
+      - ./services/app:/app
+      - /app/__pycache__
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./services/web
+      dockerfile: Dockerfile
+    container_name: ep_web
+    environment:
+      - DATABASE_URL=postgresql://epuser:eppass@db:5432/energypulse
+      - ENV=production
+    ports:
+      - "80:5000"
+    volumes:
+      - ./services/web:/app
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
